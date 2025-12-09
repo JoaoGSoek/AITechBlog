@@ -5,16 +5,16 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
-      # Esse comando faz o login do Docker no ECR da sua conta AWS
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI_BACKEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-backend
-      - REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-frontend
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
-  
+      
   build:
     commands:
       - echo Build started on `date`
+      # Definindo variáveis novamente para garantir que existam nesta fase
+      - REPOSITORY_URI_BACKEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-backend
+      - REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-frontend
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+      
       - echo Building the Backend Docker image...
       - cd backend
       - docker build -t $REPOSITORY_URI_BACKEND:latest .
@@ -29,10 +29,16 @@ phases:
   post_build:
     commands:
       - echo Build completed on `date`
+      # Definindo variáveis novamente para a fase de push
+      - REPOSITORY_URI_BACKEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-backend
+      - REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-frontend
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+      
       - echo Pushing the Docker images...
       - docker push $REPOSITORY_URI_BACKEND:latest
       - docker push $REPOSITORY_URI_BACKEND:$IMAGE_TAG
       - docker push $REPOSITORY_URI_FRONTEND:latest
       - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+      
       - echo Writing image definitions file...
       - printf '[{"name":"blog-backend","imageUri":"%s"},{"name":"blog-frontend","imageUri":"%s"}]' $REPOSITORY_URI_BACKEND:$IMAGE_TAG $REPOSITORY_URI_FRONTEND:$IMAGE_TAG > imagedefinitions.json
