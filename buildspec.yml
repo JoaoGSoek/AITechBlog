@@ -1,50 +1,38 @@
 version: 0.2
 
-env:
-  exported-variables:
-    - REPOSITORY_URI_BACKEND
-    - REPOSITORY_URI_FRONTEND
-    - IMAGE_TAG
-
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      
-      # Aqui definimos as variáveis UMA ÚNICA VEZ e exportamos para todas as fases
-      - export REPOSITORY_URI_BACKEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-backend
-      - export REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-frontend
-      - export IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
-      
+
   build:
     commands:
       - echo Build started on `date`
-      
-      - echo Building the Backend Docker image...
+      # Definimos as variáveis aqui e usamos IMEDIATAMENTE
+      - REPO_BACKEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-backend
+      - REPO_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/blog-frontend
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+
+      # --- BACKEND ---
+      - echo Building Backend...
       - cd backend
-      - docker build -t $REPOSITORY_URI_BACKEND:latest .
-      - docker tag $REPOSITORY_URI_BACKEND:latest $REPOSITORY_URI_BACKEND:$IMAGE_TAG
+      - docker build -t $REPO_BACKEND:latest .
+      - docker tag $REPO_BACKEND:latest $REPO_BACKEND:$IMAGE_TAG
+      - echo Pushing Backend...
+      - docker push $REPO_BACKEND:latest
+      - docker push $REPO_BACKEND:$IMAGE_TAG
       - cd ..
-      
-      - echo Building the Frontend Docker image...
+
+      # --- FRONTEND ---
+      - echo Building Frontend...
       - cd frontend
-      - docker build -t $REPOSITORY_URI_FRONTEND:latest .
-      - docker tag $REPOSITORY_URI_FRONTEND:latest $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
-      
-      # DEBUG: Listar imagens para garantir que foram criadas corretamente
-      - docker images
+      - docker build -t $REPO_FRONTEND:latest .
+      - docker tag $REPO_FRONTEND:latest $REPO_FRONTEND:$IMAGE_TAG
+      - echo Pushing Frontend...
+      - docker push $REPO_FRONTEND:latest
+      - docker push $REPO_FRONTEND:$IMAGE_TAG
       
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker images...
-      
-      - docker push $REPOSITORY_URI_BACKEND:latest
-      - docker push $REPOSITORY_URI_BACKEND:$IMAGE_TAG
-      
-      - docker push $REPOSITORY_URI_FRONTEND:latest
-      - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
-      
-      - echo Writing image definitions file...
-      - printf '[{"name":"blog-backend","imageUri":"%s"},{"name":"blog-frontend","imageUri":"%s"}]' $REPOSITORY_URI_BACKEND:$IMAGE_TAG $REPOSITORY_URI_FRONTEND:$IMAGE_TAG > imagedefinitions.json
+      - echo Build and Push completed successfully.
